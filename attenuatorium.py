@@ -137,6 +137,16 @@ class reflection_list():
         return len(self.refl_list)
     def set_cell(self,a,b,c,alpha,beta,gamma, wl) -> None:
         self.cell = cell(a,b,c,alpha,beta,gamma,wl)
+        mind = 999.0
+        maxd = 0.0
+        for ref in self.refl_list:
+            d = self.cell.get_d_of_hkl(ref.index())
+            if d < mind:
+                mind = d
+            if d > maxd:
+                maxd = d
+        self.max_d = maxd
+        self.min_d = mind
     def get_min_d(self):
         return self.min_d
     def get_max_d(self):
@@ -158,10 +168,11 @@ def read_hkl(filename) -> reflection_list:
               float(line[13:20]),
               float(line[21:28])
             )
-    for n in range(len(file)-i):
-        if "CELL" in file[n+i]:
-            dump,wl,a,b,c,alpha,beta,gamma = file[n+i].split()
-            listy.set_cell(a,b,c,alpha,beta,gamma,wl)
+    if i < len(file) - 1:
+        for n in range(len(file)-i):
+            if "CELL" in file[n+i]:
+                dump,wl,a,b,c,alpha,beta,gamma = file[n+i].split()
+                listy.set_cell(a,b,c,alpha,beta,gamma,wl)
     return listy
 
 root = tk.Tk()
@@ -180,7 +191,8 @@ for i,file in enumerate(file_paths):
     file2 = os.path.basename(file)
     nr = sets[i].size()
     ios_counts = sets[i].count_i_to_s_bigger_than((4.0,3.0,2.0,1.0))
-    print(f"{file2:15s} has {nr} reflections, {ios_counts[0]/nr*100:4.1f}%/{ios_counts[1]/nr*100:4.1f}%/{ios_counts[2]/nr*100:4.1f}%/{ios_counts[3]/nr*100:4.1f}% with I/s bigger than 4/3/2/1")
+    print(f"{file2:15s} has {nr} reflections, {ios_counts[0]/nr*100:4.1f}%/{ios_counts[1]/nr*100:4.1f}%/{ios_counts[2]/nr*100:4.1f}%/{ios_counts[3]/nr*100:4.1f}% \
+with I/s bigger than 4/3/2/1 d_min: {sets[-1].get_min_d():4.2f} d_max: {sets[-1].get_max_d():4.2f}")
     hkls.append(sets[-1].index_set())
     if i > 0:
         intersects.append(hkls[i-1].intersection(hkls[i]))
