@@ -1,11 +1,6 @@
 import math
 import os
-import tkinter as tk
 import numpy as np
-import scipy
-import scipy.stats
-from tkinter import filedialog
-import matplotlib.pyplot as plt
 
 class reflection():
     def __init__(self) -> None:
@@ -56,188 +51,302 @@ class cell():
         self.sa = math.sin(math.pi/180.0*self.alpha)
         self.sb = math.sin(math.pi/180.0*self.beta)
         self.sg = math.sin(math.pi/180.0*self.gamma)
-    def get_d_of_hkl(self,hkl) -> float:
+    
+    def get_d_of_hkl(self, hkl) -> float:
+        # Handle [0,0,0] as a special case
+        if hkl[0] == 0 and hkl[1] == 0 and hkl[2] == 0:
+            return 999.9  # Return a large value for d when hkl = [0,0,0]
+            
         upper = pow(hkl[0], 2) * pow(self.sa, 2) / pow(self.a, 2) \
               + pow(hkl[1], 2) * pow(self.sb, 2) / pow(self.b, 2) \
               + pow(hkl[2], 2) * pow(self.sg, 2) / pow(self.c, 2) \
               + 2.0 * hkl[1] * hkl[2] / (self.b * self.c) * (self.cb * self.cg - self.ca) \
               + 2.0 * hkl[0] * hkl[2] / (self.a * self.c) * (self.cg * self.ca - self.cb) \
               + 2.0 * hkl[0] * hkl[1] / (self.a * self.b) * (self.ca * self.cb - self.cg)
+              
         lower = 1 - pow(self.ca, 2) - pow(self.cb, 2) - pow(self.cg, 2) + 2 * self.ca * self.cb * self.cg
+        
+        # Prevent division by zero
+        if upper == 0 or lower == 0:
+            return 999.9
+            
         d = np.sqrt(lower / upper)
         return d
+    
     def get_stl_of_hkl(self,hkl) -> float:
         return 1.0 / (2 * self.get_d_of_hkl(hkl))
 
 class reflection_list():
     def __init__(self) -> None:
-        self.refl_list = np.array([[],[],[]])
+        # Store HKLs, intensities, and sigmas in separate lists initially
+        # self.refl_list = np.array([[],[],[]]) # Old structure
+        self._hkl_tuples = []  # Store (h,k,l) tuples
+        self._intensities = [] # Store intensities
+        self._sigmas = []      # Store sigmas
+        self._data_finalized = False # Flag to indicate if data is converted to NumPy arrays
+
         self.min_d = 0.0
         self.max_d = 0.0
         self.name = ""
+        self.cell = None # Initialize cell attribute
+
+    def set_cell(self, a, b, c, alpha, beta, gamma, wavelength):
+        self.cell = cell(a, b, c, alpha, beta, gamma, wavelength)
+
+    def _finalize_data_structure(self):
+        # Convert lists to NumPy arrays for efficient operations
+        # This should be called once after all appends are done (e.g., at the end of read_hkl)
+        if not self._data_finalized:
+            if self._hkl_tuples: # Check if there's any data
+                # self.refl_list_np[0] will be a 2D NumPy array where each row is an HKL [h,k,l]
+                # This happens because self._hkl_tuples is a list of numeric tuples.
+                self.refl_list_np = [
+                    np.array(self._hkl_tuples, dtype=int), # Store as int array for unique_hkl compatibility with axis=0
+                    np.array(self._intensities, dtype=float),
+                    np.array(self._sigmas, dtype=float)
+                ]
+            else: # No data, create empty structure similar to original for consistency
+                self.refl_list_np = [
+                    np.array([], dtype=int).reshape(0,3), # Ensure it's a 2D array even when empty
+                    np.array([], dtype=float),
+                    np.array([], dtype=float)
+                ]
+            self._data_finalized = True
+
     def append(self, h, k, l, i, s) -> None:
-        t = np.array([[(h,k,l),i,s]],dtype=object)
-        self.refl_list = np.append(self.refl_list,t.transpose(),axis=1)
-    def index_tuple(self) -> tuple:
-        return self.refl_list[0]
-    def unique_hkl(self) -> set:
-        li = self.index_tuple()
-        ret = np.unique(li)
-        return ret
-    def get_hkl(self,hkl) -> list:
-        ret = []
-        #condition = np.array(self.refl_list[0]==hkl)
-        condition = np.array([x == hkl for x in self.refl_list[0]])
-        ret = np.compress(condition,self.refl_list,axis=1)
-        return ret
-    def has_hkl(self,hkl) -> bool:
-        ret = False
-        for ref in self.refl_list:
-            if ref.index() == hkl:
-                ret = True
-        return ret
+        if self._data_finalized:
+            raise Exception("Cannot append after data structure is finalized.")
+
+        hkl_tuple_to_append = (int(h),int(k),int(l)) # Ensure integers
+        self._hkl_tuples.append(hkl_tuple_to_append)
+        self._intensities.append(float(i))
+        self._sigmas.append(float(s))
+
+    def index_tuple(self) -> np.ndarray: # Returns array of HKL tuples
+        if not self._data_finalized: self._finalize_data_structure()
+        return self.refl_list_np[0]
+
+    def unique_hkl(self) -> np.ndarray: # Returns unique HKLs as a 2D NumPy array (N_unique_hkls, 3)
+        if not self._data_finalized: self._finalize_data_structure()
+        if self.refl_list_np[0].size == 0:
+            return np.array([], dtype=int).reshape(0,3) # Return empty 2D array
+        
+        # Use axis=0 to find unique rows (HKLs)
+        # self.refl_list_np[0] is a 2D array of [h,k,l] rows
+        result = np.unique(self.refl_list_np[0], axis=0)
+        return result
+
+    def get_hkl(self,hkl_target) -> np.ndarray:
+        # hkl_target is expected to be a tuple (h,k,l) or something convertible to it.
+        if not self._data_finalized: self._finalize_data_structure()
+        
+        processed_hkl_target_array = None
+        if isinstance(hkl_target, np.ndarray) and hkl_target.shape == (3,):
+            try:
+                processed_hkl_target_array = hkl_target.astype(int)
+            except (ValueError, TypeError):
+                pass 
+        elif isinstance(hkl_target, (list, tuple)) and len(hkl_target) == 3:
+            try:
+                processed_hkl_target_array = np.array(hkl_target, dtype=int)
+            except (ValueError, TypeError):
+                pass
+        
+        if processed_hkl_target_array is None:
+            return np.array([[],[],[]], dtype=object) # Return empty structure if target is not a valid HKL
+
+        # self.refl_list_np[0] is a 2D NumPy array of HKLs (Nx3)
+        all_hkls_np_array = self.refl_list_np[0]
+        
+        if all_hkls_np_array.size == 0:
+            return np.array([[],[],[]], dtype=object)
+
+        # Perform row-wise comparison
+        # This creates a boolean array where each element is True if the row in all_hkls_np_array matches processed_hkl_target_array
+        condition = np.all(all_hkls_np_array == processed_hkl_target_array, axis=1)
+        matching_indices = np.where(condition)[0]
+        
+        if matching_indices.size == 0:
+            return np.array([[],[],[]], dtype=object)
+
+        # Return a 3xN array for the matching reflections
+        # For consistency with previous structure, we return HKLs as object array of tuples/lists if needed by GUI
+        # but internal operations benefit from direct NumPy arrays.
+        # For now, let's return the raw data slices, which will be numeric arrays.
+        # The GUI part that consumes this might need adjustment if it strictly expects tuples in the first part.
+        # However, get_average_intensities_for_unique_hkls will now work correctly with this.
+        
+        # Extracting HKLs for the matches: these will be rows from self.refl_list_np[0]
+        matched_hkls = self.refl_list_np[0][matching_indices] # This is a 2D array of matched HKLs
+        
+        # To maintain the [hkl_tuples_array, intensities_array, sigmas_array] structure:
+        return np.array([
+            [tuple(hkl) for hkl in matched_hkls], # Convert matched HKL arrays back to list of tuples for the output structure
+            self.refl_list_np[1][matching_indices],
+            self.refl_list_np[2][matching_indices]
+        ], dtype=object) 
+
+    def has_hkl(self,hkl_target) -> bool: # hkl_target should be a tuple
+        if not self._data_finalized: self._finalize_data_structure()
+        hkl_target_tuple = tuple(hkl_target.tolist()) if isinstance(hkl_target, np.ndarray) else tuple(hkl_target)
+        return hkl_target_tuple in self.refl_list_np[0] # Efficient if self.refl_list_np[0] is a set, but it's an array.
+                                                      # For arrays, this still involves a scan.
+
     def get_subset(self, hkl_list):
         ret = reflection_list()
         for ref in self.refl_list:
             if ref.ind in hkl_list:
-                ret.append_refl(ref)
-        return ret
-    def get_with_i_to_s_bigger_than(self, cutoff):
-        ret = reflection_list()
-        for ref in self.refl_list:
-            if ref.i_over_s() > cutoff:
-                ret.append(ref)
-        return ret
-    def count_i_to_s_bigger_than(self, cutoff) -> int:
-        ret = np.count_nonzero(self.refl_list[1]/self.refl_list[2] > cutoff)
-        return ret
-    def count_i_to_s_bigger_than(self, cutoff) -> int:
-        if type(cutoff) == type(int):
-            ret = np.count_nonzero(self.refl_list[1]/self.refl_list[2] > cut)
-        if type(cutoff) == type([]) or type(cutoff) == type(()):
-            ret = []
-            for cut in cutoff:
-                ret.append(np.count_nonzero(abs(self.refl_list[1]/self.refl_list[2]) > cut))
-        return ret
-    def size(self) -> int:
-        return self.refl_list[0].size
-    def set_cell(self,a,b,c,alpha,beta,gamma, wl) -> None:
-        self.cell = cell(a,b,c,alpha,beta,gamma,wl)
-        mind = 999.0
-        maxd = 0.0
-        d_func = np.vectorize(self.cell.get_d_of_hkl)
-        d = d_func(self.refl_list[0])
-        mind = np.min(d)
-        maxd = np.max(d)
-        self.max_d = maxd
-        self.min_d = mind
-    def get_min_d(self):
-        return self.min_d
-    def get_max_d(self):
-        return self.max_d
-    def get_intersection_indices(self, given):
-        return np.intersect1d(self.refl_list[0],given.refl_list[0])
+                pass # Incomplete method, needs to be updated for new structure
 
+    def get_unique_hkl_data(self):
+        """Processes reflection data to find unique HKLs and their averaged intensities and sigmas."""
+        if not self._data_finalized: self._finalize_data_structure()
+        
+        all_hkls = self.refl_list_np[0]
+        all_intensities = self.refl_list_np[1]
+        all_sigmas = self.refl_list_np[2]
 
+        if all_hkls.size == 0:
+            return np.array([], dtype=int).reshape(0,3), np.array([]), np.array([])
 
+        # Get unique HKLs, the inverse map, and counts for averaging
+        unique_hkls_array, inverse_indices, counts = np.unique(
+            all_hkls, axis=0, return_inverse=True, return_counts=True
+        )
+        
+        # Calculate sum of intensities and sigmas for each unique HKL
+        sum_intensities = np.bincount(inverse_indices, weights=all_intensities)
+        sum_sigmas = np.bincount(inverse_indices, weights=all_sigmas)
+        
+        # Calculate average intensities and sigmas
+        avg_intensities = sum_intensities / counts
+        avg_sigmas = sum_sigmas / counts
+    
+        return unique_hkls_array, avg_intensities, avg_sigmas
+
+    def get_common_reflections(self, other_list):
+        """Finds common HKLs between this list and another, returning averaged data for them."""
+        if not isinstance(other_list, reflection_list):
+            raise TypeError("Argument must be a reflection_list object.")
+
+        # Get unique, averaged data for both reflection lists
+        self_unique_hkls, self_avg_i, self_avg_s = self.get_unique_hkl_data()
+        other_unique_hkls, other_avg_i, other_avg_s = other_list.get_unique_hkl_data()
+
+        empty_hkl_array = np.array([], dtype=int).reshape(0,3)
+        empty_float_array = np.array([])
+
+        if self_unique_hkls.size == 0 or other_unique_hkls.size == 0:
+            return empty_hkl_array, empty_float_array, empty_float_array, empty_float_array, empty_float_array
+
+        # Create dictionaries mapping HKL tuples to their (averaged intensity, averaged sigma)
+        map_self_data = {tuple(hkl): (self_avg_i[i], self_avg_s[i]) 
+                         for i, hkl in enumerate(self_unique_hkls)}
+        map_other_data = {tuple(hkl): (other_avg_i[i], other_avg_s[i]) 
+                          for i, hkl in enumerate(other_unique_hkls)}
+
+        # Find common HKL tuples
+        common_hkl_tuples_set = set(map_self_data.keys()).intersection(map_other_data.keys())
+
+        if not common_hkl_tuples_set:
+            return empty_hkl_array, empty_float_array, empty_float_array, empty_float_array, empty_float_array
+            
+        # Sort common HKLs for consistent output order (e.g., by h, then k, then l)
+        sorted_common_hkl_tuples = sorted(list(common_hkl_tuples_set))
+
+        out_common_hkls_list = []
+        out_self_i_list = []
+        out_self_s_list = []
+        out_other_i_list = []
+        out_other_s_list = []
+
+        for hkl_tuple in sorted_common_hkl_tuples:
+            out_common_hkls_list.append(list(hkl_tuple)) # Store as list for np.array(..., dtype=int)
+            
+            s_i, s_s = map_self_data[hkl_tuple]
+            out_self_i_list.append(s_i)
+            out_self_s_list.append(s_s)
+            
+            o_i, o_s = map_other_data[hkl_tuple]
+            out_other_i_list.append(o_i)
+            out_other_s_list.append(o_s)
+
+        return (
+            np.array(out_common_hkls_list, dtype=int),
+            np.array(out_self_i_list, dtype=float),
+            np.array(out_self_s_list, dtype=float),
+            np.array(out_other_i_list, dtype=float),
+            np.array(out_other_s_list, dtype=float)
+        )
+
+# Ensure read_hkl and other functions are below the class definition if they are in this file
+# For example:
+# def read_hkl(filename):
+# ... (rest of the file)
 def read_hkl(filename) -> reflection_list:
-    file = open(filename).readlines()
-    listy = reflection_list()
-    for i,line in enumerate(file):
-        if "   0   0   0    0.00    0.00   0" in line:
-            last_line = i
+    listy = reflection_list() # Initializes with internal Python lists
+    
+    lines = []
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+    except Exception as e:
+        print(f"Error reading file {filename}: {e}")
+        return listy # Return empty list
+
+    last_line_idx = -1 # Initialize to -1, indicating 000 line not found
+
+    for i, line in enumerate(lines):
+        line = line.strip() # Remove leading/trailing whitespace
+        if not line: # Skip empty lines
+            continue
+        if "0   0   0    0.00    0.00   0" in line: # More robust check
+            last_line_idx = i
             break
-        listy.append(
-              int(line[1:4]),
-              int(line[5:8]),
-              int(line[9:12]),
-              float(line[13:20]),
-              float(line[21:28])
-            )
-    if last_line < len(file) - 1:
-        for n in range(len(file)-last_line):
-            if "CELL" in file[n+last_line]:
-                dump,wl,a,b,c,alpha,beta,gamma = file[n+last_line].split()
-                listy.set_cell(a,b,c,alpha,beta,gamma,wl)
+        try:
+            # Ensure line has enough characters before slicing
+            if len(line) >= 28:
+                h = int(line[0:4].strip()) # Adjusted slicing, added strip
+                k = int(line[4:8].strip())
+                l_val = int(line[8:12].strip()) # Renamed to avoid lint warning
+                i_val = float(line[12:20].strip())
+                s_val = float(line[20:28].strip())
+                listy.append(h, k, l_val, i_val, s_val)
+            # else: log malformed line?
+        except ValueError as ve:
+            # print(f"Skipping malformed line in {filename} (line {i+1}): {line} - {ve}")
+            continue # Skip lines that don't conform to format
+
+    # Finalize data structure after all appends
+    listy._finalize_data_structure()
+
+    # Process CELL line if 000 line was found and there are lines after it
+    if last_line_idx != -1 and last_line_idx < len(lines) -1 : # Check if last_line_idx is valid
+        for n_offset in range(last_line_idx + 1, len(lines)): # Iterate from line after 000
+            line_content = lines[n_offset].strip()
+            if "CELL" in line_content:
+                parts = line_content.split()
+                # Expecting "CELL wl a b c alpha beta gamma"
+                if len(parts) == 8: # CELL + 7 values
+                    try:
+                        # parts[0] is "CELL"
+                        wl = float(parts[1])
+                        a = float(parts[2])
+                        b = float(parts[3])
+                        c_val = float(parts[4]) # Renamed
+                        alpha = float(parts[5])
+                        beta = float(parts[6])
+                        gamma = float(parts[7])
+                        listy.set_cell(a, b, c_val, alpha, beta, gamma, wl)
+                        break # Found and processed CELL line
+                    except ValueError as ve_cell:
+                        # print(f"Error parsing CELL line in {filename}: {line_content} - {ve_cell}")
+                        pass # Or handle error more explicitly
+                # else: print(f"Malformed CELL line in {filename}: {line_content}")
+
     listy.name = os.path.basename(filename)
     return listy
 
-root = tk.Tk()
-root.withdraw()
-
-file_paths = filedialog.askopenfilenames()
-
-number_of_file = len(file_paths)
-
-sets = []
-hkls = []
-intersects = []
-colors = ['b','g','r','y']
-names = []
-
-for i,file in enumerate(file_paths):
-    sets.append(read_hkl(file))
-    names.append(sets[-1].name)
-    unique_indices = sets[-1].unique_hkl()
-    nr_unique_indices = unique_indices.size
-    nr = sets[-1].size()
-    ios_counts = sets[-1].count_i_to_s_bigger_than((4.0,3.0,2.0,1.0))
-    print(f"{sets[-1].name:15s} has {nr} reflections, {ios_counts[0]/nr*100:4.1f}%/{ios_counts[1]/nr*100:4.1f}%/{ios_counts[2]/nr*100:4.1f}%/{ios_counts[3]/nr*100:4.1f}% \
-with I/s bigger than 4/3/2/1 d_min: {sets[-1].get_min_d():4.2f} d_max: {sets[-1].get_max_d():4.2f}; {nr_unique_indices:4d} unique indices with avg. \
-{nr/nr_unique_indices:5.3f} redundancy")
-    hkls.append(unique_indices)
-    if i > 0:
-        intersects.append(sets[-2].get_intersection_indices(sets[-1]))
-        _x = []
-        _y = []
-        for hkl in intersects[-1]:
-            refs1 = sets[-2].get_hkl(hkl)
-            refs2 = sets[-1].get_hkl(hkl)
-            av1 = 0
-            size1 = refs1.shape[1]
-            for r in range(size1):
-                av1 += refs1[1][r]
-            av1 /= size1
-            _x.append(av1)
-            av2 = 0
-            size2 = refs2.shape[1]
-            for r in range(size2):
-                av2 += refs2[1][r]
-            av2 /= len(refs2)
-            _y.append(av2)
-        plt.scatter(_x,_y,s=5,facecolors='none',edgecolors=colors[i],label=f"{sets[-2].name} vs {sets[-1].name}")
-plt.xlabel(f"I(more attenuation)")
-plt.ylabel(f"I(less attenuation)")
-plt.legend(loc="upper left")
-plt.show()
-
-fig,axes = plt.subplots(2,1)
-axes[0].invert_xaxis()
-a = []
-axes[0].set_xlabel("d /Angs")
-axes[1].set_xlabel("I/sigma")
-axes[0].set_ylabel("I")
-axes[1].set_ylabel("# refl.")
-for i,s in enumerate(sets):
-    x = []
-    y = []
-    i_o_s = []
-    for ref in s.refl_list:
-        x.append(s.cell.get_d_of_hkl(ref.index()))
-        y.append(ref.i())
-        i_o_s.append(ref.i_over_s())
-    axes[0].scatter(x,y,s=5,facecolors='none',edgecolors=colors[i],label=names[i])
-    a.append(np.array(i_o_s))
-    
-    #axes.scatter(x,b_result,s=10,facecolors='none',edgecolors='g',label="b")
-    #axes.scatter(x,c_result,s=10,facecolors='none',edgecolors='r',label="c")
-    #axes.scatter(x,d_result,s=10,facecolors='none',edgecolors='y',label="d")
-    #axes.plot(x,g_result,'--',label="f_table1")
-upper = int(max(np.amax(x) for x in a))
-steps = int(upper/2)
-axes[1].hist(a,bins=np.linspace(0,upper,steps), color=colors, label=names)
-plt.legend(loc="upper right")
-plt.show()
-
-
-print("OK")
+if __name__ == "__main__":
+    print("This is a library, not a script. Use the GUI to run it.")
+    exit(0)
