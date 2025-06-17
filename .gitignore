@@ -1,2 +1,4 @@
 *.pyc
 *.bak
+/temp
+merged_data.hkl

@@ -2,10 +2,36 @@ import sys
 import os
 import numpy as np
 import scipy.stats # Added import
+
+# Function to check and install missing dependencies
+def check_and_install_dependencies():
+    required_packages = ['PyQt6', 'numpy', 'matplotlib', 'scipy']
+    missing_packages = []
+    
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            missing_packages.append(package)
+    
+    if missing_packages:
+        print(f"Missing required packages: {', '.join(missing_packages)}")
+        print("Installing missing packages...")
+        import subprocess
+        for package in missing_packages:
+            print(f"Installing {package}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        print("All required packages installed successfully.")
+
+# Check and install dependencies
+check_and_install_dependencies()
+
+# Import PyQt6 components
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                             QLabel, QPushButton, QSlider, QFileDialog, QWidget, 
                             QGroupBox, QSplitter, QComboBox, QProgressBar)
 from PyQt6.QtCore import Qt, QCoreApplication
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
@@ -101,47 +127,15 @@ class AttenuatoriumGUI(QMainWindow):
         file_layout.addWidget(QLabel("Weak File:"))
         file_layout.addWidget(self.file_combo2)
         file_group.setLayout(file_layout)
-        
-        # Threshold controls
-        threshold_group = QGroupBox("Intensity Thresholds (based on Strong File)")
+          # Threshold controls - simplified to use a single set of sliders
+        threshold_group = QGroupBox("Intensity Thresholds")
         threshold_layout = QVBoxLayout()
         
-        # Low threshold slider for Strong Set
-        low_layout = QHBoxLayout()
-        low_layout.addWidget(QLabel("Strong Low Cutoff Percentile:"))
-        self.low_threshold_slider = QSlider(Qt.Orientation.Horizontal) # Renamed from self.low_slider
-        self.low_threshold_slider.setRange(0, 100)
-        self.low_threshold_slider.setValue(int(self.low_threshold_factor * 100))
-        self.low_threshold_slider.valueChanged.connect(lambda value, name="low": self._update_threshold_sliders(name, value))
-        self.low_threshold_slider.sliderReleased.connect(self.update_plots) # Moved here
-        
-        self.low_label = QLabel(f"{self.low_threshold_factor:.2f}")
-        low_layout.addWidget(self.low_threshold_slider)
-        low_layout.addWidget(self.low_label)
-        
-        # High threshold slider for Strong Set
-        high_layout = QHBoxLayout()
-        high_layout.addWidget(QLabel("Strong High Cutoff Percentile:"))
-        self.high_threshold_slider = QSlider(Qt.Orientation.Horizontal) # Renamed from self.high_slider
-        self.high_threshold_slider.setRange(0, 100)
-        self.high_threshold_slider.setValue(int(self.high_threshold_factor * 100))
-        self.high_threshold_slider.valueChanged.connect(lambda value, name="high": self._update_threshold_sliders(name, value))
-        self.high_threshold_slider.sliderReleased.connect(self.update_plots) # Moved here
-
-        self.high_label = QLabel(f"{self.high_threshold_factor:.2f}")
-        high_layout.addWidget(self.high_threshold_slider)
-        high_layout.addWidget(self.high_label)
-        
-        threshold_layout.addLayout(low_layout)
-        threshold_layout.addLayout(high_layout)
-
-        # Threshold controls for Weak Set (for plot visualization)
-        weak_threshold_group = QGroupBox("Weak Set Thresholds (for Plot Visualization)")
-        weak_threshold_layout = QVBoxLayout()
-
-        # Weak Low threshold slider
+        # Threshold controls for both Strong and Weak Set
+        weak_threshold_group = QGroupBox("Threshold Controls")
+        weak_threshold_layout = QVBoxLayout()        # Low threshold slider (controls both Strong and Weak low thresholds)
         weak_low_layout = QHBoxLayout()
-        weak_low_layout.addWidget(QLabel("Weak Low Cutoff Percentile:"))
+        weak_low_layout.addWidget(QLabel("Low Cutoff Percentile:"))
         self.weak_low_threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.weak_low_threshold_slider.setRange(0, 100)
         self.weak_low_threshold_slider.setValue(int(self.weak_low_threshold_factor * 100))
@@ -152,9 +146,9 @@ class AttenuatoriumGUI(QMainWindow):
         weak_low_layout.addWidget(self.weak_low_threshold_slider)
         weak_low_layout.addWidget(self.weak_low_label)
 
-        # Weak High threshold slider
+        # High threshold slider (controls both Strong and Weak high thresholds)
         weak_high_layout = QHBoxLayout()
-        weak_high_layout.addWidget(QLabel("Weak High Cutoff Percentile:"))
+        weak_high_layout.addWidget(QLabel("High Cutoff Percentile:"))
         self.weak_high_threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.weak_high_threshold_slider.setRange(0, 100)
         self.weak_high_threshold_slider.setValue(int(self.weak_high_threshold_factor * 100))
@@ -291,79 +285,78 @@ class AttenuatoriumGUI(QMainWindow):
             self.low_slider.blockSignals(blocked)
             return True
         return False
-
+        
     def _handle_low_slider_drag(self, value_percent):
         self._config_low_threshold(value_percent)
         self._update_threshold_info_live()
-
+        
     def _handle_high_slider_drag(self, value_percent):
         self._config_high_threshold(value_percent)
         self._update_threshold_info_live()
-
+        
     def _update_threshold_sliders(self, slider_name, value):
         factor = value / 100.0
 
-        if slider_name == "low":
-            self.low_threshold_factor = factor
-            if self.low_threshold_factor > self.high_threshold_factor:
-                self.high_threshold_factor = self.low_threshold_factor
-                self.high_threshold_slider.setValue(int(self.high_threshold_factor * 100))
-        elif slider_name == "high":
-            self.high_threshold_factor = factor
-            if self.high_threshold_factor < self.low_threshold_factor:
-                self.low_threshold_factor = self.high_threshold_factor
-                self.low_threshold_slider.setValue(int(self.low_threshold_factor * 100))
-        elif slider_name == "weak_low":
+        if slider_name == "weak_low":
+            # Update both weak and strong low thresholds
             self.weak_low_threshold_factor = factor
+            self.low_threshold_factor = factor  # Set the strong threshold to match
+            
+            # Ensure low threshold doesn't exceed high threshold
             if self.weak_low_threshold_factor > self.weak_high_threshold_factor:
                 self.weak_high_threshold_factor = self.weak_low_threshold_factor
                 self.weak_high_threshold_slider.setValue(int(self.weak_high_threshold_factor * 100))
+                self.high_threshold_factor = self.weak_high_threshold_factor  # Update strong high threshold too
+        
         elif slider_name == "weak_high":
+            # Update both weak and strong high thresholds
             self.weak_high_threshold_factor = factor
+            self.high_threshold_factor = factor  # Set the strong threshold to match
+            
+            # Ensure high threshold isn't below low threshold
             if self.weak_high_threshold_factor < self.weak_low_threshold_factor:
                 self.weak_low_threshold_factor = self.weak_high_threshold_factor
                 self.weak_low_threshold_slider.setValue(int(self.weak_low_threshold_factor * 100))
-            self.weak_high_label.setText(f"{self.weak_high_threshold_factor:.2f}") # Update weak high label
-
-        # Update labels for all sliders to ensure consistency if one slider affects another
-        self.low_label.setText(f"{self.low_threshold_factor:.2f}")
-        self.high_label.setText(f"{self.high_threshold_factor:.2f}")
+                self.low_threshold_factor = self.weak_low_threshold_factor  # Update strong low threshold too
+            
+        # Update labels
         self.weak_low_label.setText(f"{self.weak_low_threshold_factor:.2f}")
-        self.weak_high_label.setText(f"{self.weak_high_threshold_factor:.2f}")
-
+        self.weak_high_label.setText(f"{self.weak_high_threshold_factor:.2f}")        # Update both strong and weak thresholds using the same percentile values
+        # For strong dataset
         if self.sorted_strong_intensities is not None and self.sorted_strong_intensities.size > 0:
-            self.strong_low_threshold_val = self._get_intensity_at_percentile(self.low_threshold_factor, self.sorted_strong_intensities)
-            self.strong_high_threshold_val = self._get_intensity_at_percentile(self.high_threshold_factor, self.sorted_strong_intensities)
+            self.strong_low_threshold_val = self._get_intensity_at_percentile(self.weak_low_threshold_factor, self.sorted_strong_intensities)
+            self.strong_high_threshold_val = self._get_intensity_at_percentile(self.weak_high_threshold_factor, self.sorted_strong_intensities)
         else:
             self.strong_low_threshold_val = 0 
             self.strong_high_threshold_val = np.inf
 
+        # For weak dataset
         if self.sorted_weak_intensities is not None and self.sorted_weak_intensities.size > 0:
             self.weak_low_threshold_val = self._get_intensity_at_percentile(self.weak_low_threshold_factor, self.sorted_weak_intensities)
             self.weak_high_threshold_val = self._get_intensity_at_percentile(self.weak_high_threshold_factor, self.sorted_weak_intensities)
-        else:
+        else:            
             self.weak_low_threshold_val = 0
             self.weak_high_threshold_val = np.inf
             
         self._update_threshold_info_live()
         self._live_update_plot_elements()
         self.update_status_bar_with_thresholds()
-
+        
     def _live_update_plot_elements(self):
         """Update only the threshold lines and their labels on both plots."""
         if not hasattr(self, 'canvas') or self.sorted_strong_intensities is None or self.sorted_weak_intensities is None:
             return
-
+            
         s_low = self.strong_low_threshold_val
         s_high = self.strong_high_threshold_val
         w_low = self.weak_low_threshold_val
         w_high = self.weak_high_threshold_val
-
+        
         log_sqrt_s_low = np.log10(np.sqrt(s_low)) if s_low > 1e-9 else -np.inf
         log_sqrt_s_high = np.log10(np.sqrt(s_high)) if s_high > 1e-9 else -np.inf
         log_sqrt_w_low = np.log10(np.sqrt(w_low)) if w_low > 1e-9 else -np.inf
         log_sqrt_w_high = np.log10(np.sqrt(w_high)) if w_high > 1e-9 else -np.inf
-
+        
         # Update Log Plot Lines
         if self.low_thresh_line_log:
             self.low_thresh_line_log.set_ydata([log_sqrt_s_low, log_sqrt_s_low])
@@ -391,17 +384,60 @@ class AttenuatoriumGUI(QMainWindow):
         if self.w_high_line_lin:
             self.w_high_line_lin.set_xdata([w_high, w_high])
             self.w_high_line_lin.set_label(f'W_High ({w_high:.1f})')
-
+                
         # Redraw legends if they exist and have handles
-        if self.canvas.ax_log.get_legend() and self.canvas.ax_log.get_legend().legendHandles:
+        if self.canvas.ax_log.get_legend() and self.canvas.ax_log.get_legend().legend_handles:
             self.canvas.ax_log.legend(fontsize='small', loc='best')
-        if self.canvas.ax_linear.get_legend() and self.canvas.ax_linear.get_legend().legendHandles:
+        if self.canvas.ax_linear.get_legend() and self.canvas.ax_linear.get_legend().legend_handles:
             self.canvas.ax_linear.legend(fontsize='small', loc='best')
             
         self.canvas.draw_idle()
+        
+    def update_status_bar_with_thresholds(self):
+        """Update status bar with current threshold values using rich text for proper line breaks"""
+        if hasattr(self, 'strong_low_threshold_val') and hasattr(self, 'strong_high_threshold_val'):
+            strong_msg = f"Strong thresholds: {self.strong_low_threshold_val:.1f}-{self.strong_high_threshold_val:.1f}"
+            weak_msg = ""
+            
+            if hasattr(self, 'weak_low_threshold_val') and hasattr(self, 'weak_high_threshold_val'):
+                weak_msg = f"Weak thresholds: {self.weak_low_threshold_val:.1f}-{self.weak_high_threshold_val:.1f}"
+                  # Add percentile values for clarity
+            percentile_info = f"(Percentile range: {self.weak_low_threshold_factor:.2f}-{self.weak_high_threshold_factor:.2f})"
+            strong_msg += f" {percentile_info}"
+            
+            # First clear any existing widgets
+            status_bar = self.statusBar()
+            status_bar.clearMessage()
+            
+            # Create a temporary widgets list to track what we need to remove
+            temp_widgets = []
+            for i in range(len(status_bar.children())):
+                widget = status_bar.children()[i]
+                if isinstance(widget, QLabel) and widget.objectName() == "threshold_status_label":
+                    temp_widgets.append(widget)
+            
+            # Remove old widgets
+            for widget in temp_widgets:
+                status_bar.removeWidget(widget)
+            
+            # Create a QLabel with properly formatted text
+            status_label = QLabel()
+            status_label.setObjectName("threshold_status_label")
+            
+            if weak_msg:
+                status_label.setText(f"{strong_msg}<br>{weak_msg}")
+            else:
+                status_label.setText(strong_msg)
+            
+            # Allow rich text with line breaks
+            status_label.setTextFormat(Qt.TextFormat.RichText)
+            status_bar.addWidget(status_label)
 
     def _update_threshold_info_live(self):
         """Updates threshold lines and reflection count labels live during slider drag."""
+        # Ensure all plot elements are updated
+        self._live_update_plot_elements()
+        
         active_axes = self.canvas.ax_log # Target the log plot for these specific threshold lines
 
         if self.sorted_strong_intensities is None or len(self.sorted_strong_intensities) == 0:
@@ -915,10 +951,10 @@ class AttenuatoriumGUI(QMainWindow):
 
                     if (weight_s + weight_w_scaled) > 1e-9:
                         final_i = (s_i * weight_s + w_i_scaled * weight_w_scaled) / (weight_s + weight_w_scaled)
-                        # Propagate error for weighted average: 1/sigma_avg^2 = 1/sigma_1^2 + 1/sigma_2^2
+                        # Propagate error for weighted average: 1/sigma_avg^2 = 1/sigma_1^2 + 1/sigma_2^2                        
                         final_s = np.sqrt(1 / (weight_s + weight_w_scaled)) if (weight_s + weight_w_scaled) > 0 else np.mean([s_s, w_s_scaled])
                         source = "averaged"
-                        averaged_count +=1
+                        averaged_count += 1
                     elif s_i > 1e-9: # Fallback if weights are zero (e.g. both sigmas are zero)
                         final_i = s_i
                         final_s = s_s
@@ -935,7 +971,7 @@ class AttenuatoriumGUI(QMainWindow):
                     final_i = s_i
                     final_s = s_s
                     source = "strong (default_case)"
-
+                    
             elif s_data:
                 final_i, final_s = s_data
                 source = "strong_only"
@@ -944,11 +980,11 @@ class AttenuatoriumGUI(QMainWindow):
                 # Decide whether to scale weak if it's the only source. Generally no, unless it's to match a target scale.
                 # For now, add as is.
                 source = "weak_only"
-
+                
             if final_i is not None:
-                self.merged_data.append(h, k, l_val, final_i, final_sigi if final_sigi is not None and np.isfinite(final_sigi) else 0.0)
+                self.merged_data.append(h, k, l_val, final_i, final_s if final_s is not None and np.isfinite(final_s) else 0.0)
                 merged_count += 1
-
+                
             if i % 100 == 0 or i == len(all_hkls) - 1:
                 self.progress_bar.setValue(i + 1)
                 QCoreApplication.processEvents()
@@ -956,10 +992,19 @@ class AttenuatoriumGUI(QMainWindow):
         self.progress_bar.setValue(len(all_hkls))
         self.statusBar().showMessage(f"Merge complete. Merged: {merged_count}, Replaced: {replaced_count}, Averaged: {averaged_count}")
         self.save_btn.setEnabled(True)
-    
+        
     def save_merged_data(self):
         """Save the merged reflection data to an HKL file"""
-        if self.merged_data is None or self.merged_data.refl_list_np[0].size == 0: # Check size of HKL array
+        if self.merged_data is None:
+            self.statusBar().showMessage("No merged data to save.")
+            return
+            
+        # Ensure data is finalized before accessing refl_list_np
+        if not hasattr(self.merged_data, 'refl_list_np') or not self.merged_data._data_finalized:
+            self.merged_data._finalize_data_structure()
+            
+        # Now check if there's any data
+        if self.merged_data.refl_list_np[0].size == 0:
             self.statusBar().showMessage("No merged data to save.")
             return
         
