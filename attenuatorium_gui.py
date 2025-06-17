@@ -1,8 +1,7 @@
 import sys
 import os
 import numpy as np
-# Import the existing functionality
-from attenuatorium import read_hkl, reflection_list # noqa: E402
+
 
 # Function to check and install missing dependencies
 def check_and_install_dependencies():
@@ -42,6 +41,9 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         self.ax_log = self.fig.add_subplot(121)
         self.ax_linear = self.fig.add_subplot(122)
         super(MatplotlibCanvas, self).__init__(self.fig)
+
+# Import the hkl functionality
+from attenuatorium import read_hkl, reflection_list # noqa: E402
 
 class AttenuatoriumGUI(QMainWindow):
     COLOR_USE_STRONG = 'gray'      # Use Strong data (lowest intensities)
@@ -796,9 +798,6 @@ class AttenuatoriumGUI(QMainWindow):
             self.merged_data.set_cell(actual_weak_set.cell.a, actual_weak_set.cell.b, actual_weak_set.cell.c, 
                                       actual_weak_set.cell.alpha, actual_weak_set.cell.beta, actual_weak_set.cell.gamma, 
                                       wavelength=actual_weak_set.cell.wavelength)
-        else:
-            self.statusBar().showMessage("Cell parameters not found in selected datasets. Cannot merge.")
-            return
 
         merge_scale_factor = self.linear_regression_slope_origin if hasattr(self, 'linear_regression_slope_origin') and self.linear_regression_slope_origin is not None else 1.0
 
