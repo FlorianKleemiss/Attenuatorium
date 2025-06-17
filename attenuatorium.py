@@ -297,12 +297,11 @@ def read_hkl(filename) -> reflection_list:
     last_line_idx = -1 # Initialize to -1, indicating 000 line not found
 
     for i, line in enumerate(lines):
-        line = line.strip() # Remove leading/trailing whitespace
-        if not line: # Skip empty lines
+        if not line.strip(): # Skip empty lines
             continue
-        if "0   0   0    0.00    0.00   0" in line: # More robust check
+        if "   0   0   0    0.00    0.00   0" in line: # More robust check
             last_line_idx = i
-            break
+            continue # Skip end marker, but do not break
         try:
             # Ensure line has enough characters before slicing
             if len(line) >= 28:
@@ -343,8 +342,7 @@ def read_hkl(filename) -> reflection_list:
                         # print(f"Error parsing CELL line in {filename}: {line_content} - {ve_cell}")
                         pass # Or handle error more explicitly
                 # else: print(f"Malformed CELL line in {filename}: {line_content}")
-
-    listy.name = os.path.basename(filename)
+    
     return listy
 
 if __name__ == "__main__":
