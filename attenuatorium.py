@@ -237,7 +237,8 @@ class reflection_list():
         Returns:
             np.ndarray: A 2D NumPy array where each row is an HKL tuple (h, k, l).
         """
-        if not self._data_finalized: self._finalize_data_structure()
+        if not self._data_finalized: 
+            self._finalize_data_structure()
         return self.refl_list_np[0]
 
     def unique_hkl(self) -> np.ndarray: # Returns unique HKLs as a 2D NumPy array (N_unique_hkls, 3)
@@ -248,7 +249,8 @@ class reflection_list():
         Returns:
             np.ndarray: A 2D NumPy array of unique HKL indices (h, k, l).
         """
-        if not self._data_finalized: self._finalize_data_structure()
+        if not self._data_finalized: 
+            self._finalize_data_structure()
         if self.refl_list_np[0].size == 0:
             return np.array([], dtype=int).reshape(0,3) # Return empty 2D array
 
@@ -276,7 +278,8 @@ class reflection_list():
         If no reflections match the target HKL, it returns an empty 3xN array.
         """
         # hkl_target is expected to be a tuple (h,k,l) or something convertible to it.
-        if not self._data_finalized: self._finalize_data_structure()
+        if not self._data_finalized: 
+            self._finalize_data_structure()
 
         processed_hkl_target_array = None
         if isinstance(hkl_target, np.ndarray) and hkl_target.shape == (3,):
@@ -339,7 +342,7 @@ class reflection_list():
         If the target is not valid, it returns False.
         If no reflections match the target HKL, it returns False.
         """
-        if not self._data_finalized: 
+        if not self._data_finalized:
             self._finalize_data_structure()
         hkl_target_tuple = tuple(hkl_target.tolist()) if isinstance(hkl_target, np.ndarray) else tuple(hkl_target)
         return hkl_target_tuple in self.refl_list_np[0] # Efficient if self.refl_list_np[0] is a set, but it's an array.
@@ -347,7 +350,8 @@ class reflection_list():
 
     def get_unique_hkl_data(self):
         """Processes reflection data to find unique HKLs and their averaged intensities and sigmas."""
-        if not self._data_finalized: self._finalize_data_structure()
+        if not self._data_finalized: 
+            self._finalize_data_structure()
 
         all_hkls = self.refl_list_np[0]
         all_intensities = self.refl_list_np[1]
