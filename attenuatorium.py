@@ -18,6 +18,7 @@ calculating intensities, and other operations required for crystallographic data
 
 import math
 import numpy as np
+import sys
 
 class reflection():
     """
@@ -129,6 +130,7 @@ class reflection_list():
         self.max_d = 0.0
         self.name = ""
         self.cell = None # Initialize cell attribute
+        self.refl_list_np = None # This will hold the final NumPy array structure
 
     def set_cell(self, a, b, c, alpha, beta, gamma, wavelength):
         """
@@ -242,7 +244,8 @@ class reflection_list():
         ], dtype=object)
 
     def has_hkl(self,hkl_target) -> bool: # hkl_target should be a tuple
-        if not self._data_finalized: self._finalize_data_structure()
+        if not self._data_finalized: 
+            self._finalize_data_structure()
         hkl_target_tuple = tuple(hkl_target.tolist()) if isinstance(hkl_target, np.ndarray) else tuple(hkl_target)
         return hkl_target_tuple in self.refl_list_np[0] # Efficient if self.refl_list_np[0] is a set, but it's an array.
                                                       # For arrays, this still involves a scan.
@@ -425,4 +428,4 @@ def read_hkl(filename) -> reflection_list:
 
 if __name__ == "__main__":
     print("This is a library, not a script. Use the GUI to run it.")
-    exit(0)
+    sys.exit(0)

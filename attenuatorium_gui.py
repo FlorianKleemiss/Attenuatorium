@@ -27,10 +27,30 @@ def check_and_install_dependencies():
 check_and_install_dependencies()
 
 # Import PyQt6 components
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,  # noqa: E402
-                            QLabel, QPushButton, QSlider, QFileDialog, QWidget,
-                            QGroupBox, QSplitter, QComboBox, QProgressBar)
-from PyQt6.QtCore import Qt, QCoreApplication  # noqa: E402
+try:
+    # Import QtWidgets classes individually to satisfy linter
+    from PyQt6 import QtWidgets  # noqa: E402
+    QApplication = QtWidgets.QApplication
+    QMainWindow = QtWidgets.QMainWindow
+    QVBoxLayout = QtWidgets.QVBoxLayout
+    QHBoxLayout = QtWidgets.QHBoxLayout
+    QLabel = QtWidgets.QLabel
+    QPushButton = QtWidgets.QPushButton
+    QSlider = QtWidgets.QSlider
+    QFileDialog = QtWidgets.QFileDialog
+    QWidget = QtWidgets.QWidget
+    QGroupBox = QtWidgets.QGroupBox
+    QSplitter = QtWidgets.QSplitter
+    QComboBox = QtWidgets.QComboBox
+    QProgressBar = QtWidgets.QProgressBar
+    
+    # Import QtCore classes
+    from PyQt6 import QtCore  # noqa: E402
+    Qt = QtCore.Qt
+    QCoreApplication = QtCore.QCoreApplication
+except ImportError as e:
+    print(f"Error importing PyQt6 components: {e}")
+    sys.exit(1)
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg # noqa: E402
 from matplotlib.figure import Figure # noqa: E402
@@ -71,6 +91,8 @@ class AttenuatoriumGUI(QMainWindow):
         self.strong_high_threshold_val = np.inf
         self.weak_low_threshold_val = 0
         self.weak_high_threshold_val = np.inf
+        self.low_thresh_line = None
+        self.high_thresh_line = None
 
         # Matplotlib plot canvas
         self.canvas = MatplotlibCanvas(self, width=12, height=6, dpi=100)
@@ -814,7 +836,7 @@ class AttenuatoriumGUI(QMainWindow):
         # 2. Add all weak entries above the Low cutoff (preserve multiplicity, scale intensity/sigma)
         for i in range(actual_weak_set.refl_list_np[0].shape[0]):
             intensity = actual_weak_set.refl_list_np[1][i] * merge_scale_factor
-            if intensity < self.weak_low_threshold_val: 
+            if intensity < self.weak_low_threshold_val:
                 continue
             h, k, l = actual_weak_set.refl_list_np[0][i]
             sigma = actual_weak_set.refl_list_np[2][i] * merge_scale_factor
@@ -901,6 +923,7 @@ class AttenuatoriumGUI(QMainWindow):
             self.statusBar().showMessage(f"Error saving file: {str(e)}")
 
     def swap_files(self):
+        """Swap the selected files in the comboboxes"""
         idx1 = self.file_combo1.currentIndex()
         idx2 = self.file_combo2.currentIndex()
         if idx1 != idx2 and idx1 >= 0 and idx2 >= 0:
