@@ -7,13 +7,13 @@ import numpy as np
 def check_and_install_dependencies():
     required_packages = ['PyQt6', 'numpy', 'matplotlib', 'scipy']
     missing_packages = []
-    
+
     for package in required_packages:
         try:
             __import__(package)
         except ImportError:
             missing_packages.append(package)
-    
+
     if missing_packages:
         print(f"Missing required packages: {', '.join(missing_packages)}")
         print("Installing missing packages...")
@@ -28,7 +28,7 @@ check_and_install_dependencies()
 
 # Import PyQt6 components
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,  # noqa: E402
-                            QLabel, QPushButton, QSlider, QFileDialog, QWidget, 
+                            QLabel, QPushButton, QSlider, QFileDialog, QWidget,
                             QGroupBox, QSplitter, QComboBox, QProgressBar)
 from PyQt6.QtCore import Qt, QCoreApplication  # noqa: E402
 
@@ -96,24 +96,24 @@ class AttenuatoriumGUI(QMainWindow):
         """Initialize the user interface components"""
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
-        
+
         # Create a splitter to divide the UI
         splitter = QSplitter(Qt.Orientation.Vertical)
-        
+
         # Top section: Controls
         top_widget = QWidget()
         top_layout = QVBoxLayout(top_widget)
-        
+
         # File selection controls
         file_group = QGroupBox("File Selection")
         file_layout = QHBoxLayout()
-        
+
         self.load_btn = QPushButton("Load HKL Files")
         self.load_btn.clicked.connect(self.load_files)
-        
+
         self.file_combo1 = QComboBox() # Strong file
         self.file_combo1.currentIndexChanged.connect(self.update_plots)
-        
+
         self.file_combo2 = QComboBox() # Weak file
         self.file_combo2.currentIndexChanged.connect(self.update_plots)
 
@@ -132,7 +132,7 @@ class AttenuatoriumGUI(QMainWindow):
         file_group.setLayout(file_layout)
         threshold_group = QGroupBox("Statistics")
         threshold_layout = QVBoxLayout()
-        
+
         # Threshold controls for both Strong and Weak Set
         weak_threshold_group = QGroupBox("Threshold Controls")
         weak_threshold_layout = QVBoxLayout()
@@ -188,14 +188,14 @@ class AttenuatoriumGUI(QMainWindow):
         action_layout = QHBoxLayout()
         self.merge_btn = QPushButton("Merge Data")
         self.merge_btn.clicked.connect(self.merge_data)
-        
+
         self.save_btn = QPushButton("Save Merged Data")
         self.save_btn.clicked.connect(self.save_merged_data)
         self.save_btn.setEnabled(False)
-        
+
         action_layout.addWidget(self.merge_btn)
         action_layout.addWidget(self.save_btn)
-        
+
         # Progress bar
         progress_layout = QVBoxLayout()
         progress_label = QLabel("Progress:")
@@ -204,7 +204,7 @@ class AttenuatoriumGUI(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("%p%")
-        
+
         progress_layout.addWidget(progress_label)
         progress_layout.addWidget(self.progress_bar)
           # Add all control layouts to top section
@@ -214,25 +214,25 @@ class AttenuatoriumGUI(QMainWindow):
         # top_layout.addWidget(self.stats_label) # Add stats_label to the top_layout if preferred
         top_layout.addLayout(action_layout)
         top_layout.addLayout(progress_layout)
-        
+
         # Bottom section: Plots
         bottom_widget = QWidget()
         bottom_layout = QVBoxLayout(bottom_widget)
-        
+
         # self.canvas = MatplotlibCanvas(width=5, height=4, dpi=100) # Removed redundant canvas creation
         bottom_layout.addWidget(self.canvas)
-        
+
         # Add widgets to splitter
         splitter.addWidget(top_widget)
         splitter.addWidget(bottom_widget)
-        
+
         # Set splitter sizes
         splitter.setSizes([300, 500]) # Adjusted for potentially simpler control panel
-        
+
         # Add splitter to main layout
         main_layout.addWidget(splitter)
         self.setCentralWidget(central_widget)
-        
+
         # Status bar for messages
         self.statusBar().showMessage("Ready")
 
@@ -240,15 +240,15 @@ class AttenuatoriumGUI(QMainWindow):
         """Calculates the intensity value at a given percentile of sorted intensities."""
         if sorted_intensities is None or len(sorted_intensities) == 0:
             return 0 # Default if no intensities are available
-        
+
         # Ensure percentile is within [0, 1]
         percentile = np.clip(percentile, 0.0, 1.0)
-        
+
         index = int(percentile * (len(sorted_intensities) - 1))
         # Clip index to be within valid bounds for the array
         index = np.clip(index, 0, len(sorted_intensities) - 1)
         return sorted_intensities[index]
-        
+
     def _update_threshold_sliders(self, slider_name, value):
         factor = value / 100.0
 
@@ -256,24 +256,24 @@ class AttenuatoriumGUI(QMainWindow):
             # Update both weak and strong low thresholds
             self.weak_low_threshold_factor = factor
             self.low_threshold_factor = factor  # Set the strong threshold to match
-            
+
             # Ensure low threshold doesn't exceed high threshold
             if self.weak_low_threshold_factor > self.weak_high_threshold_factor:
                 self.weak_high_threshold_factor = self.weak_low_threshold_factor
                 self.weak_high_threshold_slider.setValue(int(self.weak_high_threshold_factor * 100))
                 self.high_threshold_factor = self.weak_high_threshold_factor  # Update strong high threshold too
-        
+
         elif slider_name == "weak_high":
             # Update both weak and strong high thresholds
             self.weak_high_threshold_factor = factor
             self.high_threshold_factor = factor  # Set the strong threshold to match
-            
+
             # Ensure high threshold isn't below low threshold
             if self.weak_high_threshold_factor < self.weak_low_threshold_factor:
                 self.weak_low_threshold_factor = self.weak_high_threshold_factor
                 self.weak_low_threshold_slider.setValue(int(self.weak_low_threshold_factor * 100))
                 self.low_threshold_factor = self.weak_low_threshold_factor  # Update strong low threshold too
-            
+
         # Update labels
         self.weak_low_label.setText(f"{self.weak_low_threshold_factor:.2f}")
         self.weak_high_label.setText(f"{self.weak_high_threshold_factor:.2f}")        # Update both strong and weak thresholds using the same percentile values
@@ -282,36 +282,36 @@ class AttenuatoriumGUI(QMainWindow):
             self.strong_low_threshold_val = self._get_intensity_at_percentile(self.weak_low_threshold_factor, self.sorted_strong_intensities)
             self.strong_high_threshold_val = self._get_intensity_at_percentile(self.weak_high_threshold_factor, self.sorted_strong_intensities)
         else:
-            self.strong_low_threshold_val = 0 
+            self.strong_low_threshold_val = 0
             self.strong_high_threshold_val = np.inf
 
         # For weak dataset
         if self.sorted_weak_intensities is not None and self.sorted_weak_intensities.size > 0:
             self.weak_low_threshold_val = self._get_intensity_at_percentile(self.weak_low_threshold_factor, self.sorted_weak_intensities)
             self.weak_high_threshold_val = self._get_intensity_at_percentile(self.weak_high_threshold_factor, self.sorted_weak_intensities)
-        else:            
+        else:
             self.weak_low_threshold_val = 0
             self.weak_high_threshold_val = np.inf
-            
+
         self._update_threshold_info_live()
         self._live_update_plot_elements()
         self.update_status_bar_with_thresholds()
-        
+
     def _live_update_plot_elements(self):
         """Update only the threshold lines and their labels on both plots."""
         if not hasattr(self, 'canvas') or self.sorted_strong_intensities is None or self.sorted_weak_intensities is None:
             return
-            
+
         s_low = self.strong_low_threshold_val
         s_high = self.strong_high_threshold_val
         w_low = self.weak_low_threshold_val
         w_high = self.weak_high_threshold_val
-        
+
         log_sqrt_s_low = np.log10(np.sqrt(s_low)) if s_low > 1e-9 else -np.inf
         log_sqrt_s_high = np.log10(np.sqrt(s_high)) if s_high > 1e-9 else -np.inf
         log_sqrt_w_low = np.log10(np.sqrt(w_low)) if w_low > 1e-9 else -np.inf
         log_sqrt_w_high = np.log10(np.sqrt(w_high)) if w_high > 1e-9 else -np.inf
-        
+
         # Update Log Plot Lines
         if self.low_thresh_line_log:
             self.low_thresh_line_log.set_ydata([log_sqrt_s_low, log_sqrt_s_low])
@@ -325,7 +325,7 @@ class AttenuatoriumGUI(QMainWindow):
         if self.weak_high_thresh_line_log:
             self.weak_high_thresh_line_log.set_xdata([log_sqrt_w_high, log_sqrt_w_high])
             self.weak_high_thresh_line_log.set_label(f'W_High_L ({w_high:.1f})')
-        
+
         # Update Linear Plot Lines
         if self.s_low_line_lin:
             self.s_low_line_lin.set_ydata([s_low, s_low])
@@ -339,51 +339,51 @@ class AttenuatoriumGUI(QMainWindow):
         if self.w_high_line_lin:
             self.w_high_line_lin.set_xdata([w_high, w_high])
             self.w_high_line_lin.set_label(f'W_High ({w_high:.1f})')
-                
+
         # Redraw legends if they exist and have handles
         if self.canvas.ax_log.get_legend() and self.canvas.ax_log.get_legend().legend_handles:
             self.canvas.ax_log.legend(fontsize='small', loc='best')
         if self.canvas.ax_linear.get_legend() and self.canvas.ax_linear.get_legend().legend_handles:
             self.canvas.ax_linear.legend(fontsize='small', loc='best')
-            
+
         self.canvas.draw_idle()
-        
+
     def update_status_bar_with_thresholds(self):
         """Update status bar with current threshold values using rich text for proper line breaks"""
         if hasattr(self, 'strong_low_threshold_val') and hasattr(self, 'strong_high_threshold_val'):
             strong_msg = f"Strong thresholds: {self.strong_low_threshold_val:.1f}-{self.strong_high_threshold_val:.1f}"
             weak_msg = ""
-            
+
             if hasattr(self, 'weak_low_threshold_val') and hasattr(self, 'weak_high_threshold_val'):
                 weak_msg = f"Weak thresholds: {self.weak_low_threshold_val:.1f}-{self.weak_high_threshold_val:.1f}"
                   # Add percentile values for clarity
             percentile_info = f"(Percentile range: {self.weak_low_threshold_factor:.2f}-{self.weak_high_threshold_factor:.2f})"
             strong_msg += f" {percentile_info}"
-            
+
             # First clear any existing widgets
             status_bar = self.statusBar()
             status_bar.clearMessage()
-            
+
             # Create a temporary widgets list to track what we need to remove
             temp_widgets = []
             for i in range(len(status_bar.children())):
                 widget = status_bar.children()[i]
                 if isinstance(widget, QLabel) and widget.objectName() == "threshold_status_label":
                     temp_widgets.append(widget)
-            
+
             # Remove old widgets
             for widget in temp_widgets:
                 status_bar.removeWidget(widget)
-            
+
             # Create a QLabel with properly formatted text
             status_label = QLabel()
             status_label.setObjectName("threshold_status_label")
-            
+
             if weak_msg:
                 status_label.setText(f"{strong_msg}<br>{weak_msg}")
             else:
                 status_label.setText(strong_msg)
-            
+
             # Allow rich text with line breaks
             status_label.setTextFormat(Qt.TextFormat.RichText)
             status_bar.addWidget(status_label)
@@ -392,7 +392,7 @@ class AttenuatoriumGUI(QMainWindow):
         """Updates threshold lines and reflection count labels live during slider drag."""
         # Ensure all plot elements are updated
         self._live_update_plot_elements()
-        
+
         active_axes = self.canvas.ax_log # Target the log plot for these specific threshold lines
 
         if self.sorted_strong_intensities is None or len(self.sorted_strong_intensities) == 0:
@@ -409,7 +409,7 @@ class AttenuatoriumGUI(QMainWindow):
                 except ValueError:
                     pass # Already removed
                 self.high_thresh_line = None
-            
+
             self.low_region_label.setText("Low: N/A")
             self.middle_region_label.setText("Mid: N/A")
             self.high_region_label.setText("High: N/A")
@@ -438,7 +438,7 @@ class AttenuatoriumGUI(QMainWindow):
             low_indices = np.where(self.common_i_strong_np < low_thresh_val)[0]
             middle_indices = np.where((self.common_i_strong_np >= low_thresh_val) & (self.common_i_strong_np <= high_thresh_val))[0]
             high_indices = np.where(self.common_i_strong_np > high_thresh_val)[0]
-            
+
             self.low_region_label.setText(f"Low (<{low_thresh_val:.1f}): {len(low_indices)}")
             self.middle_region_label.setText(f"Mid [{low_thresh_val:.1f}-{high_thresh_val:.1f}]: {len(middle_indices)}")
             self.high_region_label.setText(f"High (>{high_thresh_val:.1f}): {len(high_indices)}")
@@ -447,7 +447,7 @@ class AttenuatoriumGUI(QMainWindow):
             self.low_region_label.setText(f"Low (<{low_thresh_val:.1f}): N/A")
             self.middle_region_label.setText(f"Mid [{low_thresh_val:.1f}-{high_thresh_val:.1f}]: N/A")
             self.high_region_label.setText(f"High (>{high_thresh_val:.1f}): N/A")
-        
+
         # The legend update here might be problematic if lines are on different axes.
         # Let's rely on update_plots to handle legends for each subplot.
         # if hasattr(active_axes, 'legend') and active_axes.legend_ is not None:
@@ -461,32 +461,32 @@ class AttenuatoriumGUI(QMainWindow):
         file_paths, _ = QFileDialog.getOpenFileNames(
             self, "Select HKL Files", "", "HKL Files (*.hkl)"
         )
-        
+
         if not file_paths:
             return
-            
+
         self.statusBar().showMessage("Loading files...")
         self.reflection_sets = []
         self.file_names = []
-        
+
         # Clear comboboxes
         self.file_combo1.clear()
         self.file_combo2.clear()
-        
+
         # Load each file
         for file_path in file_paths:
             try:
                 refl_set = read_hkl(file_path)
                 self.reflection_sets.append(refl_set)
                 self.file_names.append(os.path.basename(file_path))
-                
+
                 # Add to comboboxes
                 self.file_combo1.addItem(os.path.basename(file_path))
                 self.file_combo2.addItem(os.path.basename(file_path))
-                
+
             except Exception as e:
                 self.statusBar().showMessage(f"Error loading {os.path.basename(file_path)}: {str(e)}")
-                
+
         if len(self.reflection_sets) >= 2:
             # Default selection: first two files
             self.file_combo1.setCurrentIndex(0)
@@ -495,10 +495,10 @@ class AttenuatoriumGUI(QMainWindow):
             self.file_combo1.setCurrentIndex(0)
             # Potentially disable file_combo2 or prompt for a second file
             self.file_combo2.setEnabled(False) # Disable until another file is loaded
-            
+
         self.statusBar().showMessage(f"Loaded {len(self.reflection_sets)} HKL files")
         self.update_plots() # This will do a full redraw and set up threshold lines
-    
+
     def set_actual_strong_and_weak(self, strong_idx, weak_idx):
         if strong_idx != weak_idx and 0 <= strong_idx < self.file_combo1.count() and 0 <= weak_idx < self.file_combo2.count():
             self.file_combo1.setCurrentIndex(strong_idx)
@@ -510,7 +510,7 @@ class AttenuatoriumGUI(QMainWindow):
         self.canvas.ax_linear.clear()
 
         # Reset threshold lines for both plots
-        self.low_thresh_line_log = None 
+        self.low_thresh_line_log = None
         self.high_thresh_line_log = None
         self.weak_low_thresh_line_log = None
         self.weak_high_thresh_line_log = None
@@ -522,11 +522,11 @@ class AttenuatoriumGUI(QMainWindow):
 
         self.sorted_strong_intensities = None
         self.sorted_weak_intensities = None
-        
+
         if len(self.reflection_sets) < 2:
-            self.canvas.ax_log.text(0.5, 0.5, "Please load at least two HKL files.", 
+            self.canvas.ax_log.text(0.5, 0.5, "Please load at least two HKL files.",
                                   horizontalalignment='center', verticalalignment='center')
-            self.canvas.ax_linear.text(0.5, 0.5, "Load files to see linear plot.", 
+            self.canvas.ax_linear.text(0.5, 0.5, "Load files to see linear plot.",
                                   horizontalalignment='center', verticalalignment='center')
             self.low_region_label.setText("Low: N/A")
             self.middle_region_label.setText("Mid: N/A")
@@ -537,10 +537,10 @@ class AttenuatoriumGUI(QMainWindow):
             self.canvas.ax_linear.set_ylabel("I_strong")
             self.canvas.draw()
             return
-            
+
         idx1 = self.file_combo1.currentIndex()
         idx2 = self.file_combo2.currentIndex() # Corrected 'this' to 'self'
-        
+
         if idx1 < 0 or idx2 < 0 or idx1 == idx2 or idx1 >= len(self.reflection_sets) or idx2 >= len(self.reflection_sets):
             self.canvas.ax_log.text(0.5, 0.5, "Please select two different HKL files.",
                                   horizontalalignment='center', verticalalignment='center')
@@ -566,7 +566,7 @@ class AttenuatoriumGUI(QMainWindow):
             set1._finalize_data_structure()
         if not set2._data_finalized:
             set2._finalize_data_structure()
-        
+
         max_i1 = np.max(set1.refl_list_np[1]) if set1.refl_list_np[1].size > 0 else -np.inf
         max_i2 = np.max(set2.refl_list_np[1]) if set2.refl_list_np[1].size > 0 else -np.inf
 
@@ -626,7 +626,7 @@ class AttenuatoriumGUI(QMainWindow):
 
         # Filter for positive sqrt intensities before log transformation
         positive_mask = (sqrt_i_strong_common > 1e-9) & (sqrt_i_weak_common > 1e-9) # Use a small epsilon
-        
+
         if not np.any(positive_mask):
             self.canvas.ax_log.text(0.5, 0.5, "No common HKLs with positive intensities for log plot.", horizontalalignment='center', verticalalignment='center')
             # Linear plot can still be made with original intensities
@@ -634,14 +634,14 @@ class AttenuatoriumGUI(QMainWindow):
             # Proceed with log plot if data exists
             log_sqrt_i_strong = np.log10(sqrt_i_strong_common[positive_mask])
             log_sqrt_i_weak = np.log10(sqrt_i_weak_common[positive_mask])
-            
+
             self.common_i_strong_np = i_strong_common_orig # Used by _update_threshold_info_live
 
             log_sqrt_s_low = np.log10(np.sqrt(self.strong_low_threshold_val)) if self.strong_low_threshold_val > 1e-9 else -np.inf
             log_sqrt_s_high = np.log10(np.sqrt(self.strong_high_threshold_val)) if self.strong_high_threshold_val > 1e-9 else -np.inf
             log_sqrt_w_low = np.log10(np.sqrt(self.weak_low_threshold_val)) if self.weak_low_threshold_val > 1e-9 else -np.inf
             log_sqrt_w_high = np.log10(np.sqrt(self.weak_high_threshold_val)) if self.weak_high_threshold_val > 1e-9 else -np.inf
-            
+
             # Define new region masks for three regions (mutually exclusive, all points assigned)
             region_both_log = (
                 (log_sqrt_i_strong >= log_sqrt_s_low) & (log_sqrt_i_strong < log_sqrt_s_high) &
@@ -758,14 +758,14 @@ class AttenuatoriumGUI(QMainWindow):
         if len(self.reflection_sets) < 2:
             self.statusBar().showMessage("Need at least two data sets to merge")
             return
-        
+
         idx1 = self.file_combo1.currentIndex()
         idx2 = self.file_combo2.currentIndex()
-        
+
         if idx1 < 0 or idx2 < 0 or idx1 == idx2 or idx1 >= len(self.reflection_sets) or idx2 >= len(self.reflection_sets):
             self.statusBar().showMessage("Please select two different HKL files for merging.")
             return
-        
+
         set1_orig = self.reflection_sets[idx1]
         set2_orig = self.reflection_sets[idx2]
 
@@ -783,7 +783,7 @@ class AttenuatoriumGUI(QMainWindow):
         self.progress_bar.setValue(0)
         self.statusBar().showMessage(f"Setting up merge: Strong={actual_strong_name} (auto)")
         QCoreApplication.processEvents()
-        
+
         self.merged_data = reflection_list()
         if not actual_strong_set._data_finalized:
             actual_strong_set._finalize_data_structure()
@@ -791,27 +791,32 @@ class AttenuatoriumGUI(QMainWindow):
             actual_weak_set._finalize_data_structure()
 
         if actual_strong_set.cell:
-            self.merged_data.set_cell(actual_strong_set.cell.a, actual_strong_set.cell.b, actual_strong_set.cell.c, 
-                                      actual_strong_set.cell.alpha, actual_strong_set.cell.beta, actual_strong_set.cell.gamma, 
+            self.merged_data.set_cell(actual_strong_set.cell.a, actual_strong_set.cell.b, actual_strong_set.cell.c,
+                                      actual_strong_set.cell.alpha, actual_strong_set.cell.beta, actual_strong_set.cell.gamma,
                                       wavelength=actual_strong_set.cell.wavelength)
         elif actual_weak_set.cell:
-            self.merged_data.set_cell(actual_weak_set.cell.a, actual_weak_set.cell.b, actual_weak_set.cell.c, 
-                                      actual_weak_set.cell.alpha, actual_weak_set.cell.beta, actual_weak_set.cell.gamma, 
+            self.merged_data.set_cell(actual_weak_set.cell.a, actual_weak_set.cell.b, actual_weak_set.cell.c,
+                                      actual_weak_set.cell.alpha, actual_weak_set.cell.beta, actual_weak_set.cell.gamma,
                                       wavelength=actual_weak_set.cell.wavelength)
 
         merge_scale_factor = self.linear_regression_slope_origin if hasattr(self, 'linear_regression_slope_origin') and self.linear_regression_slope_origin is not None else 1.0
 
         # 1. Add all strong entries (preserve multiplicity)
         for i in range(actual_strong_set.refl_list_np[0].shape[0]):
-            h, k, l = actual_strong_set.refl_list_np[0][i]
             intensity = actual_strong_set.refl_list_np[1][i]
+            if intensity > self.weak_high_threshold_val:
+                continue
+            h, k, l = actual_strong_set.refl_list_np[0][i]
+            
             sigma = actual_strong_set.refl_list_np[2][i]
             self.merged_data.append(h, k, l, intensity, sigma)
 
-        # 2. Add all weak entries (preserve multiplicity, scale intensity/sigma)
+        # 2. Add all weak entries above the Low cutoff (preserve multiplicity, scale intensity/sigma)
         for i in range(actual_weak_set.refl_list_np[0].shape[0]):
-            h, k, l = actual_weak_set.refl_list_np[0][i]
             intensity = actual_weak_set.refl_list_np[1][i] * merge_scale_factor
+            if intensity < self.weak_low_threshold_val: 
+                continue
+            h, k, l = actual_weak_set.refl_list_np[0][i]
             sigma = actual_weak_set.refl_list_np[2][i] * merge_scale_factor
             self.merged_data.append(h, k, l, intensity, sigma)
 
@@ -819,29 +824,29 @@ class AttenuatoriumGUI(QMainWindow):
         self.progress_bar.setValue(self.merged_data.refl_list_np[0].shape[0])
         self.statusBar().showMessage(f"Merge complete. Merged: {self.merged_data.refl_list_np[0].shape[0]} reflections (multiplicity preserved, overlap doubled)")
         self.save_btn.setEnabled(True)
-        
+
     def save_merged_data(self):
         """Save the merged reflection data to an HKL file"""
         if self.merged_data is None:
             self.statusBar().showMessage("No merged data to save.")
             return
-            
+
         # Ensure data is finalized before accessing refl_list_np
         if not hasattr(self.merged_data, 'refl_list_np') or not self.merged_data._data_finalized:
             self.merged_data._finalize_data_structure()
-            
+
         # Now check if there's any data
         if self.merged_data.refl_list_np[0].size == 0:
             self.statusBar().showMessage("No merged data to save.")
             return
-        
+
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save Merged HKL File", "merged_data.hkl", "HKL Files (*.hkl)"
         )
-        
+
         if not file_path:
             return
-            
+
         try:
             with open(file_path, 'w') as f:
                 # Finalize data before accessing refl_list_np
@@ -887,10 +892,10 @@ class AttenuatoriumGUI(QMainWindow):
                     else:
                         sigma_string = f"{sigma:8.0f}"
                     f.write(f"{hkl[0]:4d}{hkl[1]:4d}{hkl[2]:4d}{intensity_string}{sigma_string}   1\n") # Added batch 1
-                
+
                 # End of file marker for SHELX
                 f.write("   0   0   0    0.00    0.00   0\n")
-                
+
             self.statusBar().showMessage(f"Merged data saved to {file_path}")
         except Exception as e:
             self.statusBar().showMessage(f"Error saving file: {str(e)}")
