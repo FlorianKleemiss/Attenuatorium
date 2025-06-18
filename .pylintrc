@@ -1,0 +1,60 @@
+[MASTER]
+# Use multiple processes to speed up Pylint
+jobs=1
+
+# Files or directories to be skipped
+ignore=CVS
+
+# Python version to use for version dependent checks
+py-version = 3.8
+
+[MESSAGES CONTROL]
+# Disable specific messages or categories
+disable=C0301,  # Line too long
+       I1101,   # c-extension-no-member (needed for PyQt6)
+       raw-checker-failed,
+       bad-inline-option,
+       locally-disabled,
+       file-ignored,
+       suppressed-message,
+       useless-suppression,
+       deprecated-pragma,
+       use-symbolic-message-instead
+
+[REPORTS]
+# Set output format
+output-format=text
+
+# Include message's id in output
+msg-template="{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}"
+
+# Tells whether to display a full report or only the messages
+reports=yes
+
+# Python expression which should return a note less than 10
+evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+
+# Set minimum score to pass linting
+fail-under=7.0
+
+[FORMAT]
+# Maximum number of characters on a single line (we're disabling this check, but keeping for reference)
+max-line-length=100
+
+# Expected format of line ending
+expected-line-ending-format=
+
+[BASIC]
+# Good variable names regexes
+good-names=i,j,k,ex,Run,_,id
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=6
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=4
+
+# Ignore imports when computing similarities
+ignore-imports=yes

@@ -28,30 +28,58 @@ class reflection():
     identified by its Miller indices (h,k,l), intensity value, and sigma (error estimate).
     """
     def __init__(self) -> None:
+        """Initialize a reflection with default values."""
         self.ind = (0,0,0)
         self.intensity = 0.0
         self.sigma = 0.0
     def __init__(self, hkl, i, s) -> None:
+        """Initialize a reflection with given HKL indices, intensity, and sigma."
+        Args:
+            hkl: A tuple or list of three integers representing the Miller indices (h, k, l)
+            i: Float representing the intensity of the reflection
+            s: Float representing the sigma (error estimate) of the intensity
+        """
         self.ind = hkl
         self.intensity = i
         self.sigma = s
     def l(self) -> int:
+        """Return the l index of the reflection."""
         return self.ind[2]
     def k(self) -> int:
+        """Return the k index of the reflection."""
         return self.ind[1]
     def h(self) -> int:
+        """Return the h index of the reflection."""
         return self.ind[0]
     def i(self) -> float:
+        """Return the intensity of the reflection."""
         return self.intensity
     def s(self) -> float:
+        """Return the sigma (error estimate) of the reflection."""
         return self.sigma
     def index(self) -> tuple:
+        """Return the indices of the reflection as a tuple (h, k, l)."""
         return self.ind
     def i_over_s(self) -> float:
+        """Return the ratio of intensity to sigma."""
         return self.intensity / self.sigma
     def ratio(self, compare) -> float:
+        """
+        Return the ratio of this reflection's intensity to another reflection's intensity.
+        Args:
+            compare: Another reflection object to compare against
+        Returns:
+            float: The ratio of this reflection's intensity to the compared reflection's intensity
+        """
         return self.i() / compare.i()
     def sigma_ratio(self, compare) -> float:
+        """
+        Return the ratio of this reflection's sigma to another reflection's sigma.
+        Args:
+            compare: Another reflection object to compare against
+        Returns:
+            float: The ratio of this reflection's sigma to the compared reflection's sigma
+        """
         return self.s() / compare.s()
 
 class cell():
@@ -84,6 +112,12 @@ class cell():
         self.sg = math.sin(math.pi/180.0*self.gamma)
 
     def get_d_of_hkl(self, hkl) -> float:
+        """Calculate the d-spacing for given Miller indices (h, k, l).
+        Args:
+            hkl: A tuple or list of three integers representing the Miller indices (h, k, l)
+        Returns:
+            float: The d-spacing for the given Miller indices, or a large value for [0,0,0]
+        """
         # Handle [0,0,0] as a special case
         if hkl[0] == 0 and hkl[1] == 0 and hkl[2] == 0:
             return 999.9  # Return a large value for d when hkl = [0,0,0]
@@ -105,6 +139,13 @@ class cell():
         return d
 
     def get_stl_of_hkl(self,hkl) -> float:
+        """
+        Calculate the sin(theta) over lambda value for given Miller indices (h, k, l).
+        Args:
+            hkl: A tuple or list of three integers representing the Miller indices (h, k, l)
+        Returns:
+            float: The stl value for the given Miller indices, or a large value for [0,0,0]
+        """
         return 1.0 / (2 * self.get_d_of_hkl(hkl))
 
 class reflection_list():
@@ -171,6 +212,15 @@ class reflection_list():
             self._data_finalized = True
 
     def append(self, h, k, l, i, s) -> None:
+        """
+        Append a new reflection to the list.
+        Args:
+            h, k, l: Integers representing the Miller indices of the reflection
+            i: Float representing the intensity of the reflection
+            s: Float representing the sigma (error estimate) of the intensity
+        Raises:
+            Exception: If the data structure is finalized and no more appends are allowed
+        """
         if self._data_finalized:
             raise Exception("Cannot append after data structure is finalized.")
 
@@ -180,10 +230,24 @@ class reflection_list():
         self._sigmas.append(float(s))
 
     def index_tuple(self) -> np.ndarray: # Returns array of HKL tuples
+        """
+        Returns the array of HKL tuples as a 2D NumPy array (N_reflections, 3).
+        This method returns the HKL indices of all reflections in the list as a 2D NumPy array.
+        If the data structure is not finalized, it will finalize it first.
+        Returns:
+            np.ndarray: A 2D NumPy array where each row is an HKL tuple (h, k, l).
+        """
         if not self._data_finalized: self._finalize_data_structure()
         return self.refl_list_np[0]
 
     def unique_hkl(self) -> np.ndarray: # Returns unique HKLs as a 2D NumPy array (N_unique_hkls, 3)
+        """
+        Returns unique HKL indices from the reflection list.
+        This method finds and returns unique HKL indices from the reflection list.
+        If the data structure is not finalized, it will finalize it first.
+        Returns:
+            np.ndarray: A 2D NumPy array of unique HKL indices (h, k, l).
+        """
         if not self._data_finalized: self._finalize_data_structure()
         if self.refl_list_np[0].size == 0:
             return np.array([], dtype=int).reshape(0,3) # Return empty 2D array
@@ -194,6 +258,23 @@ class reflection_list():
         return result
 
     def get_hkl(self,hkl_target) -> np.ndarray:
+        """
+        Retrieve reflections matching a specific HKL target.
+        This method searches for reflections with indices matching the provided HKL target.
+        Args:
+            hkl_target: A tuple or list of three integers representing the target HKL indices (h, k, l)
+        Returns:
+            np.ndarray: A 3xN NumPy array where:
+                - The first row contains the matching HKL tuples as lists or tuples
+                - The second row contains the corresponding intensities
+                - The third row contains the corresponding sigmas
+        Raises:
+            Exception: If the data structure is not finalized before searching
+        Note:
+        This method expects hkl_target to be a tuple or list of three integers (h, k, l).
+        If the target is not valid, it returns an empty 3xN array with dtype=object.
+        If no reflections match the target HKL, it returns an empty 3xN array.
+        """
         # hkl_target is expected to be a tuple (h,k,l) or something convertible to it.
         if not self._data_finalized: self._finalize_data_structure()
 
@@ -244,6 +325,20 @@ class reflection_list():
         ], dtype=object)
 
     def has_hkl(self,hkl_target) -> bool: # hkl_target should be a tuple
+        """
+        Check if a specific HKL target exists in the reflection list.
+        This method checks if the provided HKL target exists in the reflection list.
+        Args:
+            hkl_target: A tuple or list of three integers representing the target HKL indices (h, k, l)
+        Returns:
+            bool: True if the HKL target exists in the reflection list, False otherwise
+        Raises:
+            Exception: If the data structure is not finalized before checking
+        Note:
+        This method expects hkl_target to be a tuple or list of three integers (h, k, l).
+        If the target is not valid, it returns False.
+        If no reflections match the target HKL, it returns False.
+        """
         if not self._data_finalized: 
             self._finalize_data_structure()
         hkl_target_tuple = tuple(hkl_target.tolist()) if isinstance(hkl_target, np.ndarray) else tuple(hkl_target)
